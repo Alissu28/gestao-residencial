@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#4f46e5" />
+  <title>Casa em Ordem • Gerenciador de Tarefas</title>
+  <meta name="description" content="Gerenciador colaborativo de tarefas domésticas em tempo real" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Casa em Ordem" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+  <!-- Versões fixas: evita que uma atualização das bibliotecas quebre o app -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.2/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- Tela de Login (link mágico por e-mail) -->
+  <div id="tela-login" class="tela-login oculto">
+    <div class="card login-card">
+      <div class="brand-logo login-logo">🏠</div>
+      <h1>Casa em Ordem</h1>
+      <p class="texto-suave">Entre com o e-mail cadastrado da casa. Vamos enviar um link de acesso.</p>
+
+      <form id="form-login" class="form-login">
+        <input type="email" id="input-email-login" placeholder="seu@email.com" autocomplete="email" required />
+        <button type="submit" id="btn-login" class="btn-primary">Enviar link de acesso</button>
+      </form>
+
+      <p id="msg-login" class="msg-login oculto"></p>
+    </div>
+  </div>
+
+  <div class="app-shell oculto" id="app-shell">
+    <!-- Fundo escuro no celular quando o menu lateral abre -->
+    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+    <!-- Barra Lateral Retrátil -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-logo">🏠</div>
+          <div>
+            <span class="brand-nome">Casa em Ordem</span>
+            <span id="status-conexao" class="brand-status">Conectando...</span>
+          </div>
+        </div>
+        <button type="button" id="btn-fechar-sidebar" class="btn-sidebar-close" title="Recolher menu">✕</button>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="Navegação principal">
+        <button type="button" class="nav-item active" data-aba="afazeres">
+          <span class="nav-icone">📋</span>
+          <span class="nav-texto">Afazeres</span>
+          <span id="badge-qtd-afazeres" class="nav-badge">0</span>
+        </button>
+
+        <button type="button" class="nav-item" data-aba="semana">
+          <span class="nav-icone">🗓️</span>
+          <span class="nav-texto">Semana</span>
+        </button>
+
+        <button type="button" class="nav-item" data-aba="compras">
+          <span class="nav-icone">🛒</span>
+          <span class="nav-texto">Compras</span>
+          <span id="badge-qtd-compras" class="nav-badge nav-badge-neutro">0</span>
+        </button>
+
+        <button type="button" class="nav-item" data-aba="concluidos">
+          <span class="nav-icone">✅</span>
+          <span class="nav-texto">Concluídos</span>
+          <span id="badge-qtd-concluidos" class="nav-badge nav-badge-neutro">0</span>
+        </button>
+
+        <button type="button" class="nav-item" data-aba="estatisticas">
+          <span class="nav-icone">📊</span>
+          <span class="nav-texto">Estatísticas</span>
+        </button>
+
+        <button type="button" class="nav-item" data-aba="configuracoes">
+          <span class="nav-icone">⚙️</span>
+          <span class="nav-texto">Configurações</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="campo campo-quem-sou">
+          <label for="select-quem-sou">👤 Quem está usando</label>
+          <select id="select-quem-sou">
+            <option value="">Selecione...</option>
+          </select>
+        </div>
+        <div id="badge-realtime" class="realtime-pill oculto">
+          <span class="ponto-verde"></span> Sincronizado ao vivo
+        </div>
+        <button type="button" id="btn-tema" class="btn-tema-sidebar">
+          <span id="icone-tema">🌙</span>
+          <span id="texto-tema">Modo escuro</span>
+        </button>
+        <button type="button" id="btn-sair" class="btn-tema-sidebar btn-sair">
+          <span>🚪</span>
+          <span id="texto-sair">Sair</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Área Principal -->
+    <div class="main-wrapper">
+      <!-- Barra Superior -->
+      <header class="top-navbar">
+        <div class="navbar-esquerda">
+          <button type="button" id="btn-toggle-sidebar" class="btn-menu" title="Abrir ou fechar menu" aria-label="Menu">
+            ☰
+          </button>
+          <div>
+            <h1 id="titulo-pagina">Afazeres</h1>
+            <p id="subtitulo-pagina" class="subtitulo-pagina">Tarefas pendentes da casa</p>
+          </div>
+        </div>
+
+        <button type="button" id="btn-nova-tarefa" class="btn-primary btn-cta-topo">
+          + Nova Tarefa
+        </button>
+      </header>
+
+      <main class="content-area">
+        <!-- Formulário Recolhível de Criar / Editar Tarefa -->
+        <section id="painel-formulario" class="card painel-form oculto">
+          <div class="painel-form-header">
+            <h2 id="titulo-formulario">Nova Tarefa</h2>
+            <button type="button" id="btn-fechar-form" class="btn-fechar" title="Fechar">✕</button>
+          </div>
+
+          <form id="form-tarefa" class="form-tarefa">
+            <div class="campo campo-full">
+              <label for="input-titulo">O que precisa ser feito?</label>
+              <input type="text" id="input-titulo" placeholder="Ex.: Lavar a louça do almoço" required />
+            </div>
+
+            <div class="campo">
+              <label for="select-membro">Responsável</label>
+              <select id="select-membro" required>
+                <option value="">Carregando...</option>
+              </select>
+            </div>
+
+            <div class="campo">
+              <label for="select-categoria">Cômodo</label>
+              <select id="select-categoria">
+                <option value="">Sem cômodo</option>
+              </select>
+            </div>
+
+            <div class="campo">
+              <label for="input-data">Data prevista</label>
+              <input type="date" id="input-data" required />
+            </div>
+
+            <div class="campo">
+              <label for="select-turno">Turno</label>
+              <select id="select-turno">
+                <option value="Qualquer hora">🕒 Qualquer hora</option>
+                <option value="Manhã">☀️ Manhã</option>
+                <option value="Tarde">🌤️ Tarde</option>
+                <option value="Noite">🌙 Noite</option>
+              </select>
+            </div>
+
+            <div class="campo">
+              <label for="select-recorrencia">Repetição automática ao concluir</label>
+              <select id="select-recorrencia">
+                <option value="unica">1️⃣ Tarefa única (não repete)</option>
+                <option value="diaria">🔁 Diária</option>
+                <option value="dias_semana">📆 Em dias da semana específicos</option>
+                <option value="semanal">📅 Semanal (a cada 7 dias)</option>
+                <option value="quinzenal">🗓️ Quinzenal (a cada 14 dias)</option>
+                <option value="mensal">🌙 Mensal (mesmo dia do mês)</option>
+              </select>
+            </div>
+
+            <div class="campo">
+              <label for="select-pontos">Esforço (pontos)</label>
+              <select id="select-pontos">
+                <option value="1">⭐ 1 — rápida</option>
+                <option value="2">⭐⭐ 2 — média</option>
+                <option value="3">⭐⭐⭐ 3 — trabalhosa</option>
+                <option value="5">🔥 5 — pesada</option>
+              </select>
+            </div>
+
+            <div id="bloco-dias-semana" class="campo campo-full oculto">
+              <label>Repetir nos dias</label>
+              <div id="chips-dias-semana" class="grupo-chips chips-dias">
+                <button type="button" class="chip" data-dia="1">Seg</button>
+                <button type="button" class="chip" data-dia="2">Ter</button>
+                <button type="button" class="chip" data-dia="3">Qua</button>
+                <button type="button" class="chip" data-dia="4">Qui</button>
+                <button type="button" class="chip" data-dia="5">Sex</button>
+                <button type="button" class="chip" data-dia="6">Sáb</button>
+                <button type="button" class="chip" data-dia="0">Dom</button>
+              </div>
+            </div>
+
+            <label id="bloco-rodizio" class="campo-full checkbox-linha oculto">
+              <input type="checkbox" id="check-rodizio" />
+              <span>⚖️ <strong>Rodízio:</strong> a cada repetição, a tarefa passa para a próxima pessoa da casa</span>
+            </label>
+
+            <div class="campo campo-full">
+              <label for="input-observacoes">Observações (opcional)</label>
+              <textarea id="input-observacoes" rows="2" placeholder="Ex.: usar o produto do armário de cima"></textarea>
+            </div>
+
+            <div class="form-acoes campo-full">
+              <button type="button" id="btn-cancelar-edicao" class="btn-secondary oculto">
+                Cancelar
+              </button>
+              <button type="submit" id="btn-submit-tarefa" class="btn-primary">
+                Salvar Tarefa
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <!-- =====================================================
+             ABA 1: AFAZERES (PENDENTES)
+             ===================================================== -->
+        <section id="view-afazeres" class="view-section">
+          <div class="card card-resumo">
+            <div class="progresso-topo">
+              <div>
+                <span class="resumo-label">Progresso geral</span>
+                <strong id="texto-progresso" class="resumo-valor">0 de 0 concluídas</strong>
+              </div>
+              <span id="pct-pill" class="pct-pill">0%</span>
+            </div>
+            <div class="barra-fundo">
+              <div id="barra-preenchimento" class="barra-preenchimento"></div>
+            </div>
+
+            <div id="bloco-placar" class="placar-semanal oculto">
+              <span class="placar-titulo">🏆 Últimos 7 dias:</span>
+              <div id="lista-placar" class="placar-itens"></div>
+            </div>
+          </div>
+
+          <div class="card card-filtros">
+            <div class="filtros-topo-linha">
+              <input
+                type="search"
+                id="input-busca-afazeres"
+                placeholder="🔍 Buscar nos afazeres..."
+                aria-label="Buscar nos afazeres"
+              />
+              <div class="grupo-chips" id="filtros-status-afazeres">
+                <button type="button" class="chip active" data-status="todos">Todos</button>
+                <button type="button" class="chip chip-alerta oculto" data-status="atrasadas" id="chip-atrasadas">Atrasadas</button>
+                <button type="button" class="chip" data-status="hoje">Hoje</button>
+              </div>
+            </div>
+
+            <div class="filtro-bloco">
+              <span class="filtro-label">Por pessoa</span>
+              <div id="filtros-pessoas-afazeres" class="lista-scroll-horizontal"></div>
+            </div>
+
+            <div class="filtro-bloco">
+              <span class="filtro-label">Por cômodo</span>
+              <div id="filtros-categorias-afazeres" class="lista-scroll-horizontal"></div>
+            </div>
+          </div>
+
+          <div id="lista-afazeres" class="lista-tarefas">
+            <p class="vazio card">Carregando afazeres...</p>
+          </div>
+        </section>
+
+        <!-- =====================================================
+             ABA: SEMANA (PRÓXIMOS 7 DIAS)
+             ===================================================== -->
+        <section id="view-semana" class="view-section oculto">
+          <div class="card card-filtros semana-topo">
+            <div>
+              <strong>Próximos 7 dias</strong>
+              <p class="texto-suave">Arraste uma tarefa para outro dia (ou use as setas ◀ ▶ no celular).</p>
+            </div>
+            <div class="grupo-chips">
+              <button type="button" id="btn-semana-anterior" class="chip">◀ Anterior</button>
+              <button type="button" id="btn-semana-hoje" class="chip active">Hoje</button>
+              <button type="button" id="btn-semana-proxima" class="chip">Próxima ▶</button>
+            </div>
+          </div>
+          <div id="grade-semana" class="grade-semana"></div>
+        </section>
+
+        <!-- =====================================================
+             ABA: LISTA DE COMPRAS
+             ===================================================== -->
+        <section id="view-compras" class="view-section oculto">
+          <div class="card">
+            <form id="form-compra" class="form-compra">
+              <input type="text" id="input-item-compra" placeholder="O que precisa comprar? Ex.: Detergente" required />
+              <input type="text" id="input-qtd-compra" placeholder="Qtd. (opcional)" class="input-qtd" />
+              <button type="submit" id="btn-submit-compra" class="btn-primary">Adicionar</button>
+            </form>
+          </div>
+
+          <div id="lista-compras" class="lista-tarefas"></div>
+
+          <div id="bloco-comprados" class="oculto">
+            <div class="compras-comprados-topo">
+              <strong>✅ Já comprados</strong>
+              <button type="button" id="btn-limpar-comprados" class="btn-danger-soft">🧹 Limpar comprados</button>
+            </div>
+            <div id="lista-comprados" class="lista-tarefas"></div>
+          </div>
+        </section>
+
+        <!-- =====================================================
+             ABA 2: CONCLUÍDOS (ÚLTIMAS 10 + FILTRO HISTÓRICO)
+             ===================================================== -->
+        <section id="view-concluidos" class="view-section oculto">
+          <div class="card card-filtros">
+            <div class="concluidos-header-info">
+              <div>
+                <strong>Histórico de Tarefas Concluídas</strong>
+                <p id="info-contagem-concluidos" class="texto-suave">Mostrando as 10 mais recentes</p>
+              </div>
+              <button type="button" id="btn-limpar-feitas" class="btn-danger-soft oculto">
+                🧹 Limpar todas
+              </button>
+            </div>
+
+            <div class="grid-filtros-concluidos">
+              <div class="campo">
+                <label for="input-busca-concluidos">Pesquisar por nome</label>
+                <input
+                  type="search"
+                  id="input-busca-concluidos"
+                  placeholder="Ex.: louça, banheiro, lixo..."
+                />
+              </div>
+
+              <div class="campo">
+                <label for="filtro-cat-concluidos">Filtrar por cômodo</label>
+                <select id="filtro-cat-concluidos">
+                  <option value="todas">Todos os cômodos</option>
+                </select>
+              </div>
+
+              <div class="campo">
+                <label for="filtro-pessoa-concluidos">Filtrar por quem fez</label>
+                <select id="filtro-pessoa-concluidos">
+                  <option value="todos">Todas as pessoas</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div id="lista-concluidos" class="lista-tarefas"></div>
+
+          <div id="box-carregar-mais" class="box-carregar-mais oculto">
+            <button type="button" id="btn-carregar-mais" class="btn-secondary">
+              Mostrar mais antigas (+10)
+            </button>
+          </div>
+        </section>
+
+        <!-- =====================================================
+             ABA 3: ESTATÍSTICAS E GRÁFICOS
+             ===================================================== -->
+        <section id="view-estatisticas" class="view-section oculto">
+          <!-- Cartões de Indicadores (KPIs) -->
+          <div class="kpi-grid">
+            <div class="card kpi-card">
+              <div class="kpi-topo">
+                <span class="kpi-titulo">A Fazer</span>
+                <span class="kpi-icone kpi-icone-indigo">📋</span>
+              </div>
+              <strong id="kpi-pendentes" class="kpi-numero">0</strong>
+              <span id="kpi-pendentes-sub" class="kpi-sub">0 agendadas para hoje</span>
+            </div>
+
+            <div class="card kpi-card">
+              <div class="kpi-topo">
+                <span class="kpi-titulo">Concluídas</span>
+                <span class="kpi-icone kpi-icone-verde">✅</span>
+              </div>
+              <strong id="kpi-concluidas" class="kpi-numero">0</strong>
+              <span id="kpi-concluidas-sub" class="kpi-sub">0% do total registrado</span>
+            </div>
+
+            <div class="card kpi-card">
+              <div class="kpi-topo">
+                <span class="kpi-titulo">Atrasadas</span>
+                <span class="kpi-icone kpi-icone-vermelho">⚠️</span>
+              </div>
+              <strong id="kpi-atrasadas" class="kpi-numero">0</strong>
+              <span id="kpi-atrasadas-sub" class="kpi-sub">Tudo em dia</span>
+            </div>
+
+            <div class="card kpi-card">
+              <div class="kpi-topo">
+                <span class="kpi-titulo">Últimos 7 dias</span>
+                <span class="kpi-icone kpi-icone-ambar">🔥</span>
+              </div>
+              <strong id="kpi-semana" class="kpi-numero">0</strong>
+              <span id="kpi-semana-sub" class="kpi-sub">Tarefas entregues na semana</span>
+            </div>
+          </div>
+
+          <!-- Grade de Gráficos -->
+          <div class="charts-grid">
+            <div class="card chart-card">
+              <div class="chart-header">
+                <h3>Status Geral das Tarefas</h3>
+                <p>Proporção entre concluídas, em dia e atrasadas</p>
+              </div>
+              <div class="chart-canvas-wrapper">
+                <canvas id="chart-status"></canvas>
+              </div>
+            </div>
+
+            <div class="card chart-card">
+              <div class="chart-header">
+                <h3>Divisão por Pessoa</h3>
+                <p>Comparativo de tarefas feitas vs. pendentes</p>
+              </div>
+              <div class="chart-canvas-wrapper">
+                <canvas id="chart-pessoas"></canvas>
+              </div>
+            </div>
+
+            <div class="card chart-card">
+              <div class="chart-header">
+                <h3>Ritmo dos Últimos 7 Dias</h3>
+                <p>Quantidade de tarefas concluídas por dia</p>
+              </div>
+              <div class="chart-canvas-wrapper">
+                <canvas id="chart-semana"></canvas>
+              </div>
+            </div>
+
+            <div class="card chart-card">
+              <div class="chart-header">
+                <h3>Progresso por Cômodo</h3>
+                <p>Distribuição de conclusão por ambiente</p>
+              </div>
+              <div id="lista-progresso-comodos" class="lista-progresso-comodos"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =====================================================
+             ABA 4: CONFIGURAÇÕES (PESSOAS E CÔMODOS)
+             ===================================================== -->
+        <section id="view-configuracoes" class="view-section oculto">
+          <div class="grid-configuracoes">
+            <div class="card">
+              <div class="config-card-header">
+                <h2>👥 Pessoas da Casa</h2>
+                <p>Cadastre quem participa das tarefas domésticas.</p>
+              </div>
+
+              <form id="form-membro" class="form-config">
+                <input type="text" id="input-nome-membro" placeholder="Nome da pessoa" required />
+                <input type="color" id="input-cor-membro" value="#4f46e5" title="Escolha a cor" />
+                <button type="submit" id="btn-submit-membro" class="btn-primary">Adicionar</button>
+                <input type="email" id="input-email-membro" class="input-email-membro" placeholder="E-mail de login (opcional) — identifica a pessoa automaticamente" />
+              </form>
+
+              <div id="lista-membros-config" class="lista-itens-config"></div>
+            </div>
+
+            <div class="card">
+              <div class="config-card-header">
+                <h2>🛋️ Cômodos e Áreas</h2>
+                <p>Organize os ambientes para filtrar suas tarefas.</p>
+              </div>
+
+              <form id="form-categoria" class="form-config">
+                <input type="text" id="input-icone-categoria" value="🏠" maxlength="4" class="input-emoji" title="Emoji" required />
+                <input type="text" id="input-nome-categoria" placeholder="Nome do cômodo" required />
+                <button type="submit" id="btn-submit-categoria" class="btn-primary">Adicionar</button>
+              </form>
+
+              <div id="lista-categorias-config" class="lista-itens-config"></div>
+            </div>
+
+            <div class="card">
+              <div class="config-card-header">
+                <h2>🔔 Lembretes</h2>
+                <p>Receba um resumo diário das tarefas neste aparelho.</p>
+              </div>
+
+              <label class="checkbox-linha">
+                <input type="checkbox" id="check-lembretes" />
+                <span>Ativar lembrete diário</span>
+              </label>
+
+              <div class="form-config form-lembrete">
+                <label for="input-hora-lembrete" class="texto-suave">Horário</label>
+                <input type="time" id="input-hora-lembrete" value="08:00" />
+                <button type="button" id="btn-testar-lembrete" class="btn-secondary">Testar</button>
+              </div>
+
+              <p id="info-lembretes" class="texto-suave info-lembretes"></p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Notificações Flutuantes (Toasts) -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch((e) => console.warn('Service worker não registrado:', e));
+      });
+    }
+  </script>
+</body>
+</html>

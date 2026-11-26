@@ -1,0 +1,29 @@
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Google Drive
+*.gdoc
+*.gsheet
+*.gslides
+.tmp.drivedownload/
+.tmp.driveupload/
+
+# Editores
+.vscode/
+.idea/
+*.swp
+
+# Dependências e builds (caso venham a ser usados)
+node_modules/
+dist/
+
+# Variáveis de ambiente e segredos
+.env
+.env.*
+*.local
+
+# Logs
+*.log
+npm-debug.log*
