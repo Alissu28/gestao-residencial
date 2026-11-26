@@ -68,7 +68,7 @@ Ao concluir uma tarefa recorrente, a próxima ocorrência (com suas subtarefas) 
 ### 2. Login (Supabase Auth)
 1. Em **Authentication → Sign In / Providers**, mantenha **Email** ativo e **desative "Allow new users to sign up"**. Assim, só pessoas convidadas conseguem entrar.
 2. Em **Authentication → Users → Invite user**, convide o e-mail de cada morador.
-3. Em **Authentication → URL Configuration**, coloque o endereço do app (ex.: `https://SEU-USUARIO.github.io/casa-em-ordem/`) em **Site URL** e em **Redirect URLs**.
+3. Em **Authentication → URL Configuration**, coloque o endereço do app (ex.: `https://alissu28.github.io/gestao-residencial/`) em **Site URL** e em **Redirect URLs**.
 4. No app, em **Configurações → Pessoas da Casa**, vincule o e-mail de cada morador (botão ✉️) para que o app reconheça quem está usando.
 
 ### 3. Publicação (GitHub Pages)
@@ -89,7 +89,7 @@ Em **Settings → Pages** do repositório, escolha *Deploy from a branch*, branc
 ## 📁 Estrutura do Projeto
 
 ```text
-casa-em-ordem/
+gestao-residencial/
 ├── index.html          # Estrutura das abas, formulários, login e canvas dos gráficos
 ├── style.css           # Estilização responsiva, barra lateral retrátil e temas claro/escuro
 ├── app.js              # Lógica da aplicação, login, CRUD, Realtime, semana, compras, lembretes e gráficos
